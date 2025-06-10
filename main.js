@@ -129,7 +129,8 @@ reader.on("data", (packet) => {
   }
 
   // sendData(xacc_ms2, yacc_ms2, zacc_ms2, roll, pitch, yaw, rollspeed, pitchspeed, yawspeed);
-  sendData(xacc_ms2, -yacc_ms2, zacc_ms2, roll, pitch, yaw, rollspeed, pitchspeed, yawspeed);
+  // sendData(xacc_ms2, -yacc_ms2, zacc_ms2, roll, pitch, yaw, rollspeed, pitchspeed, yawspeed);
+  sendData(xacc_ms2, -yacc_ms2, zacc_ms2, roll_deg, rollspeed_deg, pitch_deg, pitchspeed_deg, yaw_deg, yawspeed_deg);
 
   // sendData(xacc_ms2, yacc_ms2, zacc_ms2, roll_deg, pitch_deg, yaw_deg, rollspeed_deg, pitchspeed_deg, yawspeed_deg);
 });
