@@ -1,0 +1,25 @@
+{
+  "input": {
+    "mode": "serial",
+    "serial": {
+      "path": "/dev/cu.usbmodem1101",
+      "baudRate": 115200,
+      "dataBits": 8,
+      "stopBits": 1,
+      "parity": "none"
+    },
+    "udp": {
+      "host": "0.0.0.0",
+      "port": 8081
+    }
+  },
+  "flypt": {
+    "host": "127.0.0.1",
+    "port": 4123,
+    "enabled": true
+  },
+  "display": {
+    "pretty": true,
+    "showTimestamp": true
+  }
+}

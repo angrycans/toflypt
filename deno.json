@@ -1,0 +1,17 @@
+{
+  "nodeModulesDir": "auto",
+  "compilerOptions": {
+    "lib": ["deno.ns", "deno.window", "dom"]
+  },
+  "tasks": {
+    "dev": "deno run --allow-all --unstable-worker-options main.ts --config ./config.example.json",
+    "start": "deno run --allow-all --unstable-worker-options main.ts",
+    "compile:mac": "deno compile --allow-all --output dist/toflypt-macos main.ts",
+    "compile:win": "deno compile --allow-all --target x86_64-pc-windows-msvc --output dist/toflypt-win.exe main.ts"
+  },
+  "imports": {
+    "@std/cli/parse-args": "jsr:@std/cli@^1.0.21/parse-args",
+    "@std/fmt/colors": "jsr:@std/fmt@^1.0.8/colors",
+    "@std/path": "jsr:@std/path@^1.1.2"
+  }
+}

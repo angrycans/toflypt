@@ -134,3 +134,14 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Deno
+.deno/
+deno-dir/
+.DS_Store
+
+# Deno compile output
+dist/
+
+# Local runtime config
+config.local.json
