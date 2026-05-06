@@ -35,6 +35,13 @@ type AppConfig = {
     pretty: boolean;
     showTimestamp: boolean;
   };
+  filter: {
+    enabled: boolean;
+    positionAlpha: number;
+    speedAlpha: number;
+    positionDeadzone: number;
+    speedDeadzone: number;
+  };
 };
 
 type MotionFrame = {
@@ -56,6 +63,13 @@ const FRAME_FOOTER_2 = 0x0a;
 const PAYLOAD_LENGTH = 36;
 const FRAME_LENGTH = 42;
 const GRAVITY = 9.80665;
+const DEFAULT_FILTER_CONFIG = {
+  enabled: false,
+  positionAlpha: 0.12,
+  speedAlpha: 0.08,
+  positionDeadzone: 0.2,
+  speedDeadzone: 0.5,
+} as const;
 
 function getTimestamp(enabled: boolean): string {
   return enabled ? `[${new Date().toISOString()}] ` : "";
@@ -124,6 +138,76 @@ function compensateGravity(frame: MotionFrame): MotionFrame {
   };
 }
 
+function applyDeadzone(value: number, threshold: number): number {
+  return Math.abs(value) < threshold ? 0 : value;
+}
+
+function applyLowPass(previous: number | null, current: number, alpha: number): number {
+  if (previous === null) {
+    return current;
+  }
+
+  return previous + alpha * (current - previous);
+}
+
+function createFrameFilter(config: AppConfig): (frame: MotionFrame) => MotionFrame {
+  if (!config.filter.enabled) {
+    return (frame: MotionFrame) => frame;
+  }
+
+  let previousRollPos: number | null = null;
+  let previousPitchPos: number | null = null;
+  let previousYawPos: number | null = null;
+  let previousRollSpeed: number | null = null;
+  let previousPitchSpeed: number | null = null;
+  let previousYawSpeed: number | null = null;
+
+  return (frame: MotionFrame) => {
+    const rollPos = applyDeadzone(
+      applyLowPass(previousRollPos, frame.rollPos, config.filter.positionAlpha),
+      config.filter.positionDeadzone,
+    );
+    previousRollPos = rollPos;
+
+    const pitchPos = applyDeadzone(
+      applyLowPass(previousPitchPos, frame.pitchPos, config.filter.positionAlpha),
+      config.filter.positionDeadzone,
+    );
+    previousPitchPos = pitchPos;
+
+    const yawPos = applyLowPass(previousYawPos, frame.yawPos, config.filter.positionAlpha);
+    previousYawPos = yawPos;
+
+    const rollSpeed = applyDeadzone(
+      applyLowPass(previousRollSpeed, frame.rollSpeed, config.filter.speedAlpha),
+      config.filter.speedDeadzone,
+    );
+    previousRollSpeed = rollSpeed;
+
+    const pitchSpeed = applyDeadzone(
+      applyLowPass(previousPitchSpeed, frame.pitchSpeed, config.filter.speedAlpha),
+      config.filter.speedDeadzone,
+    );
+    previousPitchSpeed = pitchSpeed;
+
+    const yawSpeed = applyDeadzone(
+      applyLowPass(previousYawSpeed, frame.yawSpeed, config.filter.speedAlpha),
+      config.filter.speedDeadzone,
+    );
+    previousYawSpeed = yawSpeed;
+
+    return {
+      ...frame,
+      rollPos,
+      pitchPos,
+      yawPos,
+      rollSpeed,
+      pitchSpeed,
+      yawSpeed,
+    };
+  };
+}
+
 function formatFrame(frame: MotionFrame, pretty: boolean): string {
   if (!pretty) {
     return JSON.stringify(frame);
@@ -154,14 +238,9 @@ function formatFrame(frame: MotionFrame, pretty: boolean): string {
   ].join(" | ");
 }
 
-function buildFlyPtPacket(frame: MotionFrame): Uint8Array {
-  const packet = new Uint8Array(FRAME_LENGTH);
-  packet[0] = FRAME_HEADER_1;
-  packet[1] = FRAME_HEADER_2;
-  packet[2] = PAYLOAD_LENGTH;
-
+function buildFlyPtPayload(frame: MotionFrame): Uint8Array {
   const payload = new Uint8Array(PAYLOAD_LENGTH);
-  const view = new DataView(payload.buffer);
+  const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
   const values = [
     frame.swayAcc,
     frame.surgeAcc,
@@ -175,12 +254,7 @@ function buildFlyPtPacket(frame: MotionFrame): Uint8Array {
   ];
 
   values.forEach((value, index) => view.setFloat32(index * 4, value, true));
-  packet.set(payload, 3);
-  packet[39] = checksum(payload);
-  packet[40] = FRAME_FOOTER_1;
-  packet[41] = FRAME_FOOTER_2;
-
-  return packet;
+  return payload;
 }
 
 class FrameBuffer {
@@ -238,9 +312,52 @@ function isSerialPortNotFound(error: Error): boolean {
   return message.includes("no such file") || message.includes("cannot open") || message.includes("file not found") || message.includes("enoent");
 }
 
+function getWindowsParity(parity: Parity): "n" | "e" | "o" {
+  if (parity === "even") {
+    return "e";
+  }
+
+  if (parity === "odd") {
+    return "o";
+  }
+
+  return "n";
+}
+
+function getSerialDevicePath(path: string): string {
+  if (Deno.build.os !== "windows") {
+    return path;
+  }
+
+  if (path.startsWith("\\\\.\\")) {
+    return path;
+  }
+
+  return `\\\\.\\${path}`;
+}
+
 async function configureSerialPort(config: AppConfig): Promise<void> {
   if (Deno.build.os === "windows") {
-    throw new Error("Serial mode is currently implemented for macOS/Linux only in this Deno build.");
+    const command = new Deno.Command("cmd", {
+      args: [
+        "/c",
+        "mode",
+        `${config.input.serial.path}:`,
+        `BAUD=${config.input.serial.baudRate}`,
+        `PARITY=${getWindowsParity(config.input.serial.parity)}`,
+        `DATA=${config.input.serial.dataBits}`,
+        `STOP=${config.input.serial.stopBits}`,
+      ],
+    });
+
+    const result = await command.output();
+    if (!result.success) {
+      const stderr = new TextDecoder().decode(result.stderr).trim();
+      const stdout = new TextDecoder().decode(result.stdout).trim();
+      throw new Error(stderr || stdout || "Failed to configure serial port via mode");
+    }
+
+    return;
   }
 
   const sttyFlag = Deno.build.os === "darwin" ? "-f" : "-F";
@@ -290,8 +407,15 @@ async function loadConfig(configPath?: string): Promise<LoadedConfig> {
   for (const candidate of candidates) {
     try {
       const content = await Deno.readTextFile(candidate);
+      const parsed = JSON.parse(content) as Partial<AppConfig>;
       return {
-        config: JSON.parse(content) as AppConfig,
+        config: {
+          ...parsed,
+          filter: {
+            ...DEFAULT_FILTER_CONFIG,
+            ...(parsed.filter ?? {}),
+          },
+        } as AppConfig,
         path: candidate,
       };
     } catch (error: unknown) {
@@ -313,10 +437,10 @@ async function createFlyPtSender(config: AppConfig): Promise<(frame: MotionFrame
   }
 
   const socket = dgram.createSocket("udp4");
-  let hasLoggedFlyPtConnected = false;
+  let hasLoggedFlyPtForwardingActive = false;
   console.log(green(`${getTimestamp(config.display.showTimestamp)}FlyPT UDP client ready -> ${config.flypt.host}:${config.flypt.port}`));
   return async (frame: MotionFrame) => {
-    const packet = buildFlyPtPacket(frame);
+    const packet = buildFlyPtPayload(frame);
     await new Promise<void>((resolveSend, rejectSend) => {
       socket.send(packet, config.flypt.port, config.flypt.host, (error: Error | null) => {
         if (error) {
@@ -327,9 +451,9 @@ async function createFlyPtSender(config: AppConfig): Promise<(frame: MotionFrame
       });
     });
 
-    if (!hasLoggedFlyPtConnected) {
-      hasLoggedFlyPtConnected = true;
-      console.log(green(`${getTimestamp(config.display.showTimestamp)}FlyPT connected ${config.flypt.host}:${config.flypt.port}`));
+    if (!hasLoggedFlyPtForwardingActive) {
+      hasLoggedFlyPtForwardingActive = true;
+      console.log(green(`${getTimestamp(config.display.showTimestamp)}FlyPT forwarding active -> ${config.flypt.host}:${config.flypt.port}`));
     }
   };
 }
@@ -369,15 +493,16 @@ async function startUdpInput(config: AppConfig, onFrame: (frame: MotionFrame) =>
 }
 
 async function startSerialInput(config: AppConfig, onFrame: (frame: MotionFrame) => Promise<void>) {
-  console.log(cyan(`${getTimestamp(config.display.showTimestamp)}Connecting serial port ${config.input.serial.path} @ ${config.input.serial.baudRate}`));
+  console.log(cyan(`${getTimestamp(config.display.showTimestamp)}Configuring serial port ${config.input.serial.path} @ ${config.input.serial.baudRate}`));
 
   await configureSerialPort(config);
+  console.log(green(`${getTimestamp(config.display.showTimestamp)}Serial port ready ${config.input.serial.path}`));
+  console.log(cyan(`${getTimestamp(config.display.showTimestamp)}Waiting for serial data on ${config.input.serial.path}`));
 
-  const port = await Deno.open(config.input.serial.path, { read: true });
+  const port = await Deno.open(getSerialDevicePath(config.input.serial.path), { read: true });
 
   const buffer = new FrameBuffer();
-
-  console.log(green(`${getTimestamp(config.display.showTimestamp)}Serial port connected ${config.input.serial.path}`));
+  let hasLoggedSerialDataDetected = false;
 
   const readBuffer = new Uint8Array(1024);
   try {
@@ -388,6 +513,12 @@ async function startSerialInput(config: AppConfig, onFrame: (frame: MotionFrame)
       }
 
       const chunk = readBuffer.slice(0, bytesRead);
+
+      if (!hasLoggedSerialDataDetected) {
+        hasLoggedSerialDataDetected = true;
+        console.log(green(`${getTimestamp(config.display.showTimestamp)}Serial data stream detected on ${config.input.serial.path}`));
+      }
+
       const frames = buffer.push(chunk);
       for (const frame of frames) {
         await onFrame(frame);
@@ -422,12 +553,27 @@ async function main() {
   }
 
   const forwardToFlyPt = await createFlyPtSender(config);
+  const filterFrame = createFrameFilter(config);
+  let lastRxLogAt = 0;
+  let lastTxLogAt = 0;
 
   const onFrame = async (frame: MotionFrame) => {
     const compensatedFrame = compensateGravity(frame);
+    const filteredFrame = filterFrame(compensatedFrame);
+
+    const now = Date.now();
+    if (now - lastRxLogAt >= 1000) {
+      lastRxLogAt = now;
+      console.log(cyan(`${getTimestamp(config.display.showTimestamp)}RX ${formatFrame(filteredFrame, config.display.pretty)}`));
+    }
 
     if (config.flypt.enabled) {
-      await forwardToFlyPt(compensatedFrame);
+      await forwardToFlyPt(filteredFrame);
+
+      if (now - lastTxLogAt >= 1000) {
+        lastTxLogAt = now;
+        console.log(yellow(`${getTimestamp(config.display.showTimestamp)}TX ${formatFrame(filteredFrame, config.display.pretty)} -> ${config.flypt.host}:${config.flypt.port}`));
+      }
     }
   };
 

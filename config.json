@@ -21,5 +21,12 @@
   "display": {
     "pretty": true,
     "showTimestamp": true
+  },
+  "filter": {
+    "enabled": false,
+    "positionAlpha": 0.12,
+    "speedAlpha": 0.08,
+    "positionDeadzone": 0.2,
+    "speedDeadzone": 0.5
   }
 }
