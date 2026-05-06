@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-read --allow-write --allow-env --allow-run main.ts",
+    "compile:mac": "deno compile --allow-read --allow-write --allow-env --allow-run --output dist/fixdirt2-macos main.ts",
+    "compile:win": "deno compile --allow-read --allow-write --allow-env --allow-run --target x86_64-pc-windows-msvc --output dist/fixdirt2-win.exe main.ts"
+  },
+  "imports": {
+    "@std/fmt/colors": "jsr:@std/fmt@^1.0.8/colors",
+    "@std/path": "jsr:@std/path@^1.1.2"
+  }
+}

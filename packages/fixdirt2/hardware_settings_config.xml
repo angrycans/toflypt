@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<hardware_settings_config deviceId="0x2702" version="23">
+	<cpu>
+		<threadStrategy renderProcessor="0" updateProcessor="2" dataSetMonitorProcessor="4" workerMapFile="system/workerMap8Core.xml" dvdStorageProcessor="7" forceFeedbackProcessor="6" fileStreamProcessor="5" />
+	</cpu>
+	<audio_card>
+		<dynamic_range value="low" />
+		<eq value="flat" />
+		<voice_chat enabled="true" />
+		<push_to_talk enabled="true" />
+	</audio_card>
+	<motion_platform>
+	    <udp enabled="true" extradata="3" ip="127.0.0.1" port="20778" delay="1" />
+		<dbox enabled="true" />
+		<custom_udp ip="127.0.0.1" enabled="false" delay="1" port="20777" filename="packet_data.xml" />
+		<fanatec ledTrueForGearsFalseForSpeed="true" wheelVibrationScale="1.0" pedalVibrationScale="1.0" enabled="true" />
+	</motion_platform>
+	<physics vehicleDamage="true" environmentalDamage="true" />
+	<input device_type="auto" />
+	<controls neutralTimeToShift="0.25" />
+	<graphics_card rating="4">
+		<eyefinity osd="" force="" />
+		<stereo convergence="0.5" enabled="false" separation="0.015" />
+		<resolution fullscreen="1" refreshRate="59" width="4098" taa="1" multisampling="8xmsaa" height="768" vsync="0" aspect="auto" supersampling="1" />
+		<gamma level="1.0" />
+		<hdr level="1.0" />
+	</graphics_card>
+	<shaders low_quality="false" />
+	<textures quality="3" />
+	<anisotropic target="16" />
+	<shadows grass="true" particles="true" maskQuality="2" enabled="true" size="3072" />
+	<particles lowResScalar="2" wind="true" emissionRate="1.0" enabled="true" dynamicRes="false" nearFadeBias="0" />
+	<weather quality="1" />
+	<crowd detail="4" enabled="true" />
+	<cloth tessellation="true" enabled="true" />
+	<ground_cover lodScaling="1.0" enabled="true" clutter="true" />
+	<objects maxlod="0" stones="true" lod="1.02" />
+	<trees meshes="true" maxlod="0" lod="1.2" />
+	<vehicles textureQuality="3" lodQuality="3" characterQuality="4" />
+	<track lod="2.0" />
+	<reflections>
+		<envmap mindistance="150.0" facesPerFrame="6" scaleminsize="0.75" size="1024" quality="2" />
+		<ibl specularSize="512" specularSamples="128" probeSize="512" diffuseSamples="128" diffuseSize="16" />
+	</reflections>
+	<mirrors width="768" height="256" car_culldist="300.0" car_maxlod="1" enabled="true" />
+	<skidmarks enabled="true" />
+	<dynamic_ambient_occ enabled="true" quality="4" />
+	<dynamic_ambient_occ_soft enabled="true" />
+	<night_lighting renderOrganisms="true" renderTrees="true" renderVehicles="true" onlyHeadlights="false" volumes="true" shadowSize="2048" shadows="true" />
+	<anisotropic target="4" />
+	<aoit enabled="false" />
+	<avsm enabled="true" />
+	<postprocess>
+		<motion_blur replayonly="false" enabled="true" />
+		<god_rays replayonly="false" enabled="true" />
+		<chromatic_aberration replayonly="false" enabled="true" />
+		<bloom replayonly="false" enabled="true" />
+		<lens_flares replayonly="false" enabled="true" />
+		<light_streaks replayonly="false" enabled="true" />
+		<lens_dust enabled="true" />
+	</postprocess>
+	<screenspace_reflections replayonly="false" enabled="true" />
+</hardware_settings_config>
